@@ -64,6 +64,22 @@ class ActiveRecord::ConnectionAdapters::NullDBAdapter < ActiveRecord::Connection
     true
   end
 
+  def reconnect
+    true
+  end
+
+  def disconnect
+    true
+  end
+
+  def discard!
+    true
+  end
+
+  def active?
+    true
+  end
+
   def create_table(table_name, options = {})
     table_definition = new_table_definition(self, table_name, options.delete(:temporary), options)
 
@@ -163,6 +179,19 @@ class ActiveRecord::ConnectionAdapters::NullDBAdapter < ActiveRecord::Connection
     NullObject.new
   end
 
+  def raw_execute(sql, name, *args, **kwargs)
+    self.execution_log << Statement.new(entry_point, sql)
+    NullObject.new
+  end
+
+  def perform_query(raw_connection, sql, binds, type_casted_binds, prepare:, notification_payload:, batch:)
+    NullObject.new
+  end
+
+  def affected_rows(result)
+    1
+  end
+
   def exec_query(statement, name = 'SQL', binds = [], options = {})
     internal_exec_query(statement, name, binds, **options)
   end
@@ -223,6 +252,11 @@ class ActiveRecord::ConnectionAdapters::NullDBAdapter < ActiveRecord::Connection
     with_entry_point(:select_values) do
       super(statement, name)
     end
+  end
+
+  def write_query?(sql)
+    return false unless sql.is_a?(String)
+    !sql.match?(/\A\s*(SELECT|SHOW|SET|DESCRIBE|DESC|EXPLAIN)\b/i)
   end
 
   def primary_key(table_name)
@@ -319,7 +353,7 @@ class ActiveRecord::ConnectionAdapters::NullDBAdapter < ActiveRecord::Connection
 
   def new_table_definition(adapter = nil, table_name = nil, is_temporary = nil, options = {})
     case ::ActiveRecord::VERSION::MAJOR
-    when 6, 7
+    when 6, 7, 8
       TableDefinition.new(self, table_name, temporary: is_temporary, options: options.except(:id))
     when 5
       TableDefinition.new(table_name, is_temporary, options.except(:id), nil)
